@@ -4,26 +4,57 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "@/store/store";
-import { logout } from "@/store/slices/authSlice";
+import { logout, fetchUserProfile } from "@/store/slices/authSlice";
 
 export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { user, isAuthenticated, profileFetched, isLoading } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/auth/login");
-    }
-  }, [isAuthenticated, router]);
+    // Handle authentication and profile fetching
+    const handleAuth = async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      
+      if (!isAuthenticated && !token) {
+        const currentUrl = typeof window !== 'undefined' ? window.location.pathname : '/dashboard';
+        router.replace(`/auth/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
+      } else if (isAuthenticated && !profileFetched) {
+        dispatch(fetchUserProfile());
+      }
+    };
+
+    handleAuth();
+  }, [isAuthenticated, profileFetched, router, dispatch]);
 
   const handleLogout = () => {
     dispatch(logout());
-    router.push("/auth/login");
+    window.location.href = '/auth/login';
   };
 
+  // Only show loading when actively fetching profile
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  // Show error state if profile fetch failed
+  if (isAuthenticated && profileFetched && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-600">
+          Error loading user profile. Please try logging in again.
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything while checking authentication
   if (!isAuthenticated || !user) {
-    return <div>Loading...</div>;
+    return null;
   }
 
   return (
@@ -38,7 +69,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-gray-700">
-                Welcome, {user.firstName}!
+                Welcome, {user?.firstName || 'User'}!
               </span>
               <button
                 onClick={handleLogout}

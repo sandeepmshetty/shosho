@@ -8,6 +8,7 @@ import * as yup from 'yup';
 import Link from 'next/link';
 import { loginUser } from '@/store/slices/authSlice';
 import { AppDispatch, RootState } from '@/store/store';
+import { useEffect } from 'react';
 
 const loginSchema = yup.object({
   email: yup.string().email('Invalid email').required('Email is required'),
@@ -19,7 +20,17 @@ type LoginFormData = yup.InferType<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const { isLoading, error } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, isLoading, error } = useSelector((state: RootState) => state.auth);
+  
+  useEffect(() => {
+    console.log('Auth state changed:', { isAuthenticated });
+    if (isAuthenticated) {
+      const params = new URLSearchParams(window.location.search);
+      const callbackUrl = params.get('callbackUrl') || '/dashboard';
+      console.log('Redirecting to:', callbackUrl);
+      router.push(decodeURIComponent(callbackUrl));
+    }
+  }, [isAuthenticated, router]);
 
   const {
     register,
@@ -33,7 +44,10 @@ export default function LoginPage() {
     try {
       const result = await dispatch(loginUser(data));
       if (loginUser.fulfilled.match(result)) {
-        router.push('/dashboard');
+        // Login was successful, useEffect will handle the redirect
+        console.log('Login successful, waiting for redirect...');
+      } else if (loginUser.rejected.match(result)) {
+        console.error('Login failed:', result.payload);
       }
     } catch (error) {
       console.error('Login error:', error);

@@ -18,15 +18,33 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   isAuthenticated: boolean;
+  profileFetched: boolean;
 }
 
-const initialState: AuthState = {
-  user: null,
-  token: null,
-  isLoading: false,
-  error: null,
-  isAuthenticated: false,
+const getInitialState = (): AuthState => {
+  if (typeof window === 'undefined') {
+    return {
+      user: null,
+      token: null,
+      isLoading: false,
+      error: null,
+      isAuthenticated: false,
+      profileFetched: false,
+    };
+  }
+
+  const token = localStorage.getItem('token');
+  return {
+    user: null,
+    token: token,
+    isLoading: false,
+    error: null,
+    isAuthenticated: !!token,
+    profileFetched: false,
+  };
 };
+
+const initialState: AuthState = getInitialState();
 
 // Async thunks
 export const loginUser = createAsyncThunk(
@@ -55,12 +73,12 @@ export const registerUser = createAsyncThunk(
 
 export const fetchUserProfile = createAsyncThunk(
   'auth/fetchProfile',
-  async (_, { rejectWithValue, getState }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const state = getState() as { auth: AuthState };
-      const response = await authAPI.getProfile(state.auth.token!);
+      const response = await authAPI.getProfile();
       return response.data;
     } catch (error: any) {
+      // If we get a 401, we'll let the axios interceptor handle the logout
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch profile');
     }
   }
@@ -75,8 +93,13 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       state.error = null;
-      // Clear from localStorage
-      localStorage.removeItem('token');
+      state.isLoading = false;
+      state.profileFetched = false;
+      // Clear from localStorage and cookie
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      }
     },
     clearError: (state) => {
       state.error = null;
@@ -98,10 +121,15 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.accessToken;
-        state.isAuthenticated = true;
-        localStorage.setItem('token', action.payload.accessToken);
+        // Handle both direct response and header-based auth
+        const token = action.payload?.accessToken || localStorage.getItem('token');
+        if (token) {
+          state.token = token;
+          state.isAuthenticated = true;
+          localStorage.setItem('token', token);
+          // We'll fetch the user profile separately
+          state.profileFetched = false;
+        }
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -124,8 +152,19 @@ const authSlice = createSlice({
         state.error = action.payload as string;
       })
       // Fetch Profile
+      .addCase(fetchUserProfile.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
         state.user = action.payload;
+        state.profileFetched = true;
+      })
+      .addCase(fetchUserProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        state.profileFetched = true;
       });
   },
 });
