@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
@@ -23,35 +24,40 @@ export default function LoginPage() {
   const { isAuthenticated, isLoading, error } = useSelector((state: RootState) => state.auth);
   
   useEffect(() => {
-    console.log('Auth state changed:', { isAuthenticated });
     if (isAuthenticated) {
       const params = new URLSearchParams(window.location.search);
       const callbackUrl = params.get('callbackUrl') || '/dashboard';
-      console.log('Redirecting to:', callbackUrl);
-      router.push(decodeURIComponent(callbackUrl));
+      router.replace(decodeURIComponent(callbackUrl));
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, error]);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<LoginFormData>({
     resolver: yupResolver(loginSchema),
+    mode: 'onBlur'
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (formData: LoginFormData) => {
+    if (!isValid) return;
+    
     try {
-      const result = await dispatch(loginUser(data));
+      const result = await dispatch(loginUser(formData));
       if (loginUser.fulfilled.match(result)) {
-        // Login was successful, useEffect will handle the redirect
-        console.log('Login successful, waiting for redirect...');
-      } else if (loginUser.rejected.match(result)) {
-        console.error('Login failed:', result.payload);
+        const params = new URLSearchParams(window.location.search);
+        const callbackUrl = params.get('callbackUrl') || '/dashboard';
+        router.replace(decodeURIComponent(callbackUrl));
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch {
+      // Error handling is managed by Redux
     }
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevent form from submitting traditionally
+    handleSubmit(onSubmit)(e);
   };
 
   return (
@@ -63,13 +69,13 @@ export default function LoginPage() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{' '}
-            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500">
               create a new account
             </Link>
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+        <form className="mt-8 space-y-6" onSubmit={handleFormSubmit}>
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="sr-only">

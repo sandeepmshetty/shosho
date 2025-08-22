@@ -38,7 +38,8 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response?.status === 401 && !error.config._retry) {
+    // Only handle token expiration for authenticated requests
+    if (error.response?.status === 401 && !error.config._retry && error.config.headers?.Authorization) {
       error.config._retry = true;
       // Clear auth state and redirect to login
       if (typeof window !== 'undefined') {

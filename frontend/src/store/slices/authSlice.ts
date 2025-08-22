@@ -117,23 +117,24 @@ const authSlice = createSlice({
       // Login
       .addCase(loginUser.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        // Don't clear error here to maintain it during loading
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.isLoading = false;
-        // Handle both direct response and header-based auth
-        const token = action.payload?.accessToken || localStorage.getItem('token');
-        if (token) {
-          state.token = token;
+        state.error = null; // Clear any previous errors
+        if (action.payload?.user && action.payload?.accessToken) {
+          state.user = action.payload.user;
+          state.token = action.payload.accessToken;
           state.isAuthenticated = true;
-          localStorage.setItem('token', token);
-          // We'll fetch the user profile separately
-          state.profileFetched = false;
+          localStorage.setItem('token', action.payload.accessToken);
+          state.profileFetched = true;
         }
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+        state.isAuthenticated = false; // Ensure we're not authenticated on login failure
+        state.token = null;
       })
       // Register
       .addCase(registerUser.pending, (state) => {
