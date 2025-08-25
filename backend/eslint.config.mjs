@@ -12,23 +12,26 @@ export default tseslint.config(
   ...tseslint.configs.recommendedTypeChecked,
   eslintPluginPrettierRecommended,
   {
+    linterOptions: {
+      reportUnusedDisableDirectives: true,
+    },
     languageOptions: {
+      parserOptions: {
+        project: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
       globals: {
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: 'commonjs',
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
+      sourceType: 'module',
     },
-  },
-  {
     rules: {
+      'linebreak-style': ['error', 'unix'],
+      'prettier/prettier': ['error', { endOfLine: 'lf' }],
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn'
+      '@typescript-eslint/no-unsafe-argument': 'warn',
     },
   },
 );

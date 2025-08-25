@@ -1,0 +1,25 @@
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
+# TypeScript and JavaScript files
+*.ts text
+*.tsx text
+*.js text
+*.jsx text
+
+# JSON files
+*.json text
+
+# YAML files
+*.yml text
+*.yaml text
+
+# Markdown files
+*.md text diff=markdown
+
+# Don't modify binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary

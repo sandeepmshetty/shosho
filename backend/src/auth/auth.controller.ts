@@ -8,12 +8,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Request as ExpressRequest } from 'express';
 import { User } from '../users/entities/user.entity';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -30,14 +30,14 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
-  @UseGuards(AuthGuard('jwt'))
   getProfile(@Request() req: ExpressRequest & { user: User }) {
     return req.user;
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
-  @UseGuards(AuthGuard('jwt'))
   @HttpCode(HttpStatus.OK)
   logout() {
     // For JWT, logout is typically handled client-side

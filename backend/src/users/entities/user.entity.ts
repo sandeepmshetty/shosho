@@ -4,8 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { SocialAccount } from '../../social-accounts/entities/social-account.entity';
 
 @Entity('users')
 export class User {
@@ -44,7 +46,6 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // Relationships will be added later
-  // @OneToMany(() => SocialAccount, socialAccount => socialAccount.user)
-  // socialAccounts: SocialAccount[];
+  @OneToMany(() => SocialAccount, (socialAccount) => socialAccount.user)
+  socialAccounts: SocialAccount[];
 }

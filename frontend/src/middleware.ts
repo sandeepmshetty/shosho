@@ -3,11 +3,13 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   // Check both cookie and Authorization header for token
-  const token = request.cookies.get('token')?.value || request.headers.get('Authorization')?.replace('Bearer ', '');
-  
+  const token =
+    request.cookies.get('token')?.value ||
+    request.headers.get('Authorization')?.replace('Bearer ', '');
+
   const isAuthPage = request.nextUrl.pathname.startsWith('/auth');
   const isPublicPage = ['/', '/about'].includes(request.nextUrl.pathname);
-  const isDashboard = request.nextUrl.pathname === '/dashboard';
+  const isDashboard = request.nextUrl.pathname.startsWith('/dashboard');
 
   // Add debug headers to response
   const response = NextResponse.next();

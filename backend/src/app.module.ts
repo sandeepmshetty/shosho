@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { SocialAccountsModule } from './social-accounts/social-accounts.module';
 import { databaseConfig } from './config/database.config';
 
 @Module({
@@ -13,6 +14,7 @@ import { databaseConfig } from './config/database.config';
     TypeOrmModule.forRoot(databaseConfig),
     AuthModule,
     UsersModule,
+    SocialAccountsModule,
   ],
 })
 export class AppModule {}
