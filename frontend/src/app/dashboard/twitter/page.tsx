@@ -26,6 +26,13 @@ interface TwitterAccount {
   status: 'active' | 'inactive' | 'revoked' | 'error';
 }
 
+interface NewTwitterUser {
+  id: string;
+  username: string;
+  platformId: string;
+  status: string;
+}
+
 interface TwitterAnalytics {
   organic_metrics: {
     impression_count: number;
@@ -40,6 +47,8 @@ export default function TwitterDashboard() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<TwitterAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [newUser, setNewUser] = useState<NewTwitterUser | null>(null);
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -62,6 +71,8 @@ export default function TwitterDashboard() {
 
   const handleTwitterLogin = async () => {
     try {
+      setConnecting(true);
+
       console.log(
         'Making API call to:',
         apiEndpoints.socialAccounts.twitter.auth
@@ -83,10 +94,62 @@ export default function TwitterDashboard() {
         throw new Error('No authUrl received from server');
       }
 
-      window.location.href = data.authUrl;
+      // Open popup window for OAuth
+      const popup = window.open(
+        data.authUrl,
+        'twitterAuth',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      );
+
+      if (!popup) {
+        throw new Error('Popup blocked. Please allow popups for this site.');
+      }
+
+      // Listen for popup closure and OAuth completion
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          setConnecting(false);
+          // Refresh accounts list after potential connection
+          fetchAccounts();
+        }
+      }, 1000);
+
+      // Listen for messages from popup (if OAuth completes successfully)
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+
+        if (event.data.type === 'TWITTER_AUTH_SUCCESS') {
+          clearInterval(checkClosed);
+          popup.close();
+          setConnecting(false);
+          // Set the new user data for display
+          if (event.data.user) {
+            setNewUser(event.data.user);
+            // Auto-clear the new user notification after 5 seconds
+            setTimeout(() => setNewUser(null), 5000);
+          }
+          // Refresh accounts to show newly connected account
+          fetchAccounts();
+          window.removeEventListener('message', messageListener);
+        } else if (event.data.type === 'TWITTER_AUTH_ERROR') {
+          clearInterval(checkClosed);
+          popup.close();
+          setConnecting(false);
+          console.error('Twitter authentication error:', event.data.error);
+          window.removeEventListener('message', messageListener);
+        }
+      };
+
+      window.addEventListener('message', messageListener);
     } catch (error) {
       console.error('Error initiating Twitter login:', error);
-      alert('Failed to connect X account. Please try again.');
+      setConnecting(false);
+      alert(
+        `Failed to connect X account: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
     }
   };
 
@@ -113,13 +176,58 @@ export default function TwitterDashboard() {
 
   return (
     <div className="container mx-auto p-4">
+      {/* New User Connected Notification */}
+      {newUser && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-green-600"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-green-800">
+                X Account Connected Successfully!
+              </h3>
+              <p className="text-sm text-green-600">
+                Welcome <strong>@{newUser.username}</strong>! Your account has
+                been connected and is ready to use.
+              </p>
+            </div>
+            <button
+              onClick={() => setNewUser(null)}
+              className="flex-shrink-0 text-green-400 hover:text-green-500"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">X Dashboard</h1>
         <Button
           onClick={handleTwitterLogin}
-          className="bg-black hover:bg-gray-800 text-white"
+          disabled={connecting}
+          className="bg-black hover:bg-gray-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Connect X Account
+          {connecting ? 'Connecting...' : 'Connect X Account'}
         </Button>
       </div>
 

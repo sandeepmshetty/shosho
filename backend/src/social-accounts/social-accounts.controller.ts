@@ -46,12 +46,13 @@ export class SocialAccountsController {
 
   // Twitter-specific endpoints
   @Get('twitter/auth')
-  async getTwitterAuthUrl(@Req() req: RequestWithUser) {
+  getTwitterAuthUrl(@Req() req: RequestWithUser) {
     const state = `${req.user.id}-${Date.now()}`;
     const authUrl = this.twitterService.getAuthorizationUrl(state);
     return { authUrl, state };
   }
 
+  @Get('twitter/callback')
   @Post('twitter/callback')
   async handleTwitterCallback(
     @Query('code') code: string,
