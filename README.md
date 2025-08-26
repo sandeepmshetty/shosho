@@ -13,8 +13,9 @@ A comprehensive social media management platform with NestJS backend and Next.js
 ## 🛠️ CI/CD Pipeline Status
 
 This project includes a complete CI/CD pipeline with:
+
 - ✅ **Continuous Integration**: Automated testing and code quality checks
-- ✅ **Pull Request Analysis**: Bundle size analysis and change detection  
+- ✅ **Pull Request Analysis**: Bundle size analysis and change detection
 - ✅ **Security Scanning**: Vulnerability detection with Trivy
 - ✅ **Multi-environment Support**: Development, staging, and production deployments
 
@@ -30,6 +31,7 @@ shosho/
 ## Tech Stack
 
 ### Frontend
+
 - **Framework**: Next.js 15.4
 - **Language**: TypeScript
 - **State Management**: Redux Toolkit
@@ -40,6 +42,7 @@ shosho/
 - **UI Components**: React 19.1 with Lucide React icons
 
 ### Backend
+
 - **Framework**: NestJS 11
 - **Language**: TypeScript
 - **API**: REST & GraphQL (Apollo)
@@ -48,6 +51,7 @@ shosho/
 - **Caching**: Redis
 
 ### Infrastructure
+
 - **Database**: PostgreSQL 15 (Alpine)
 - **Cache**: Redis 7 (Alpine)
 - **Containerization**: Docker & Docker Compose
@@ -56,6 +60,7 @@ shosho/
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js
 - Docker and Docker Compose
 - pnpm (recommended) or npm
@@ -63,17 +68,20 @@ shosho/
 ### Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/sandeepmshetty/shosho.git
    cd shosho
    ```
 
 2. Start the infrastructure:
+
    ```bash
    docker-compose up -d
    ```
 
 3. Install frontend dependencies:
+
    ```bash
    cd frontend
    pnpm install
@@ -88,6 +96,7 @@ shosho/
 ### Development
 
 1. Start the backend:
+
    ```bash
    cd backend
    pnpm start:dev
@@ -104,6 +113,7 @@ The frontend will be available at `http://localhost:3000` and the backend at `ht
 ## Available Scripts
 
 ### Frontend
+
 - `pnpm dev`: Start development server with Turbopack
 - `pnpm build`: Build for production
 - `pnpm start`: Start production server
@@ -111,6 +121,7 @@ The frontend will be available at `http://localhost:3000` and the backend at `ht
 - `pnpm type-check`: Run TypeScript type checking
 
 ### Backend
+
 - `pnpm start:dev`: Start development server
 - `pnpm start:debug`: Start server in debug mode
 - `pnpm start:prod`: Start production server
@@ -121,6 +132,7 @@ The frontend will be available at `http://localhost:3000` and the backend at `ht
 ## Infrastructure
 
 The project includes:
+
 - PostgreSQL database with multiple database support
 - Redis for caching and session management
 - Grafana for monitoring and visualization
