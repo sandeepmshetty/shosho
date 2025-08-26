@@ -5,6 +5,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
 import { databaseConfig } from './config/database.config';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -16,5 +18,7 @@ import { databaseConfig } from './config/database.config';
     UsersModule,
     SocialAccountsModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
