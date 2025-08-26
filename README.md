@@ -1,6 +1,22 @@
-# SHOSHO
+# SHO-SHO
 
-A modern full-stack application with Next.js frontend and NestJS backend, featuring authentication, GraphQL integration, and Docker-based infrastructure.
+A comprehensive social media management platform with NestJS backend and Next.js frontend.
+
+## ✨ Features
+
+- **Multi-platform Integration**: Support for Twitter, Facebook, and Instagram
+- **User Authentication**: JWT-based authentication system
+- **Social Account Management**: Link and manage multiple social media accounts
+- **Modern Tech Stack**: NestJS + Next.js + TypeORM + PostgreSQL
+- **🚀 CI/CD Pipeline**: Comprehensive GitHub Actions workflows
+
+## 🛠️ CI/CD Pipeline Status
+
+This project includes a complete CI/CD pipeline with:
+- ✅ **Continuous Integration**: Automated testing and code quality checks
+- ✅ **Pull Request Analysis**: Bundle size analysis and change detection  
+- ✅ **Security Scanning**: Vulnerability detection with Trivy
+- ✅ **Multi-environment Support**: Development, staging, and production deployments
 
 ## Project Structure
 
