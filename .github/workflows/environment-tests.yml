@@ -1,0 +1,199 @@
+name: Environment Tests
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC to test staging environment
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        environment:
+          - ${{ github.event.inputs.environment || 'staging' }}
+        service:
+          - name: Backend API
+            endpoint: /api/health
+            expected_status: 200
+          - name: Frontend
+            endpoint: /
+            expected_status: 200
+
+    steps:
+      - name: Check ${{ matrix.service.name }}
+        run: |
+          echo "Testing ${{ matrix.service.name }} on ${{ matrix.environment }}"
+
+          url="https://${{ matrix.environment }}.shosho.com${{ matrix.service.endpoint }}"
+          response=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+
+          if [ "$response" -eq "${{ matrix.service.expected_status }}" ]; then
+            echo "✅ ${{ matrix.service.name }} is healthy (HTTP $response)"
+          else
+            echo "❌ ${{ matrix.service.name }} is unhealthy (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Detailed API Test (Backend only)
+        if: matrix.service.name == 'Backend API'
+        run: |
+          # Test specific API endpoints
+          endpoints=(
+            "/api/health"
+            "/api/auth/status"
+          )
+
+          base_url="https://${{ matrix.environment }}.shosho.com"
+
+          for endpoint in "${endpoints[@]}"; do
+            echo "Testing ${base_url}${endpoint}"
+            response=$(curl -s -w "%{http_code}" "${base_url}${endpoint}")
+            http_code=$(echo "$response" | tail -c 4)
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 400 ]; then
+              echo "✅ ${endpoint} OK (HTTP $http_code)"
+            else
+              echo "❌ ${endpoint} FAILED (HTTP $http_code)"
+              exit 1
+            fi
+          done
+
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    needs: health-check
+
+    steps:
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run performance tests
+        run: |
+          cat > performance-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+
+          export const options = {
+            stages: [
+              { duration: '2m', target: 10 }, // Ramp up
+              { duration: '5m', target: 10 }, // Stay at 10 users
+              { duration: '2m', target: 0 },  // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<500'], // 95% of requests must complete below 500ms
+              http_req_failed: ['rate<0.1'],   // Error rate must be below 10%
+            },
+          };
+
+          export default function () {
+            const baseUrl = 'https://${{ github.event.inputs.environment || 'staging' }}.shosho.com';
+
+            // Test homepage
+            let response = http.get(`${baseUrl}`);
+            check(response, {
+              'homepage status is 200': (r) => r.status === 200,
+              'homepage loads in <500ms': (r) => r.timings.duration < 500,
+            });
+
+            // Test API health endpoint
+            response = http.get(`${baseUrl}/api/health`);
+            check(response, {
+              'API health status is 200': (r) => r.status === 200,
+              'API responds in <200ms': (r) => r.timings.duration < 200,
+            });
+
+            sleep(1);
+          }
+          EOF
+
+          k6 run performance-test.js
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: health-check
+
+    steps:
+      - name: Install OWASP ZAP
+        run: |
+          docker pull owasp/zap2docker-stable
+
+      - name: Run security scan
+        run: |
+          target_url="https://${{ github.event.inputs.environment || 'staging' }}.shosho.com"
+
+          docker run -v $(pwd):/zap/wrk/:rw \
+            -t owasp/zap2docker-stable \
+            zap-baseline.py \
+            -t "$target_url" \
+            -J zap-report.json \
+            -r zap-report.html || true
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-scan-results-${{ github.event.inputs.environment || 'staging' }}
+          path: |
+            zap-report.json
+            zap-report.html
+
+  notify-results:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [health-check, performance-test, security-scan]
+    if: always()
+
+    steps:
+      - name: Prepare notification
+        id: prepare
+        run: |
+          env="${{ github.event.inputs.environment || 'staging' }}"
+          health_status="${{ needs.health-check.result }}"
+          perf_status="${{ needs.performance-test.result }}"
+          security_status="${{ needs.security-scan.result }}"
+
+          if [ "$health_status" = "success" ] && [ "$perf_status" = "success" ] && [ "$security_status" = "success" ]; then
+            overall="✅ PASSED"
+            color="good"
+          else
+            overall="❌ FAILED"
+            color="danger"
+          fi
+
+          echo "environment=$env" >> $GITHUB_OUTPUT
+          echo "overall=$overall" >> $GITHUB_OUTPUT
+          echo "color=$color" >> $GITHUB_OUTPUT
+          echo "health=$health_status" >> $GITHUB_OUTPUT
+          echo "performance=$perf_status" >> $GITHUB_OUTPUT
+          echo "security=$security_status" >> $GITHUB_OUTPUT
+
+      - name: Create summary
+        run: |
+          echo "# 🧪 Environment Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.prepare.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status:** ${{ steps.prepare.outputs.overall }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health Check:** ${{ steps.prepare.outputs.health }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance Test:** ${{ steps.prepare.outputs.performance }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scan:** ${{ steps.prepare.outputs.security }}" >> $GITHUB_STEP_SUMMARY

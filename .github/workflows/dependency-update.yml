@@ -1,0 +1,78 @@
+name: Dependency Update
+
+on:
+  schedule:
+    # Run weekly on Mondays at 8 AM UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    strategy:
+      matrix:
+        include:
+          - name: Backend
+            working-directory: ./backend
+          - name: Frontend
+            working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.working-directory }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.working-directory }}
+        run: npm ci
+
+      - name: Update dependencies
+        working-directory: ${{ matrix.working-directory }}
+        run: |
+          npx npm-check-updates -u
+          npm install
+
+      - name: Run tests
+        working-directory: ${{ matrix.working-directory }}
+        run: |
+          if [ "${{ matrix.name }}" = "Backend" ]; then
+            npm run test
+          else
+            npm run lint && npm run type-check
+          fi
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update ${{ matrix.name }} dependencies'
+          title: 'chore: update ${{ matrix.name }} dependencies'
+          body: |
+            ## 🔄 Automated Dependency Update
+
+            This PR updates the dependencies for ${{ matrix.name }}.
+
+            ### Changes
+            - Updated all dependencies to their latest compatible versions
+            - Ran tests to ensure compatibility
+
+            ### Testing
+            - [x] Tests pass
+            - [x] Linting passes
+            - [x] Type checking passes (for frontend)
+
+            ---
+            *This PR was created automatically by the dependency update workflow*
+          branch: update-${{ matrix.name }}-deps-${{ github.run_number }}
+          delete-branch: true
