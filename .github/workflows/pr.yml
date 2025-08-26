@@ -168,8 +168,7 @@ jobs:
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           pattern: './frontend/.next/static/**/*.js'
-          build-script: 'npm run build'
-          directory: './frontend'
+          build-script: 'cd frontend && npm run build'
 
   # PR comment with summary
   pr-summary:
