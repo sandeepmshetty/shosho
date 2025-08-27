@@ -71,8 +71,7 @@ jobs:
         working-directory: ./backend
         run: npm run test:e2e
         env:
-          DATABASE_URL: postgres://test_user:test123@localhost:5432/shosho_test
-          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
 
       - name: Build application
         working-directory: ./backend

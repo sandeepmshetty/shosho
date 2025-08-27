@@ -2,8 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Server } from 'http';
-import { AppModule } from './../src/app.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
+import { AppController } from '../src/app.controller';
+import { AppService } from '../src/app.service';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -11,20 +12,14 @@ describe('AppController (e2e)', () => {
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideModule(TypeOrmModule)
-      .useModule(
-        TypeOrmModule.forRoot({
-          type: 'sqlite',
-          database: ':memory:',
-          entities: [__dirname + '/../src/**/*.entity{.ts,.js}'],
-          synchronize: true,
-          logging: false,
-          dropSchema: true,
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
         }),
-      )
-      .compile();
+      ],
+      controllers: [AppController],
+      providers: [AppService],
+    }).compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
