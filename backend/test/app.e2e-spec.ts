@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Server } from 'http';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from '../src/app.controller';
 import { AppService } from '../src/app.service';
@@ -16,15 +15,6 @@ describe('AppController (e2e)', () => {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-        }),
-        TypeOrmModule.forRoot({
-          type: 'sqlite',
-          database: ':memory:',
-          entities: [__dirname + '/../src/**/*.entity{.ts,.js}'],
-          synchronize: true,
-          logging: false,
-          dropSchema: true,
-          autoLoadEntities: true,
         }),
       ],
       controllers: [AppController],
