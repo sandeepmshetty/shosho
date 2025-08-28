@@ -1,0 +1,63 @@
+# Azure DevOps Pipeline for Development Environment
+# Simplified pipeline for development builds and testing
+
+trigger:
+  branches:
+    include:
+      - develop
+      - feature/*
+
+pr: none
+
+variables:
+  nodeVersion: '20.x'
+  buildConfiguration: 'development'
+
+stages:
+  - stage: DevBuild
+    displayName: 'Development Build'
+    jobs:
+      - job: QuickBuild
+        displayName: 'Quick Build & Test'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(nodeVersion)'
+            displayName: 'Install Node.js'
+
+          - script: |
+              cd backend && npm ci
+              cd ../frontend && npm ci
+            displayName: 'Install Dependencies'
+
+          - script: |
+              cd backend && npm run lint && npm run test
+              cd ../frontend && npm run lint && npm run type-check
+            displayName: 'Lint & Test'
+
+          - script: |
+              cd backend && npm run build
+              cd ../frontend && npm run build
+            displayName: 'Build Applications'
+            env:
+              NEXT_PUBLIC_API_URL: 'https://dev-api.yourdomain.com'
+              NEXT_PUBLIC_APP_URL: 'https://dev.yourdomain.com'
+
+  - stage: DevDeploy
+    displayName: 'Deploy to Development'
+    dependsOn: DevBuild
+    condition: succeeded()
+    jobs:
+      - deployment: DeployDev
+        displayName: 'Deploy to Dev Environment'
+        environment: 'development'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "Deploy to development environment"
+                  displayName: 'Development Deployment'

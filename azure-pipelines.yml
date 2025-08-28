@@ -1,0 +1,231 @@
+# Azure DevOps CI/CD Pipeline for SHO-SHO
+# Multi-stage pipeline for frontend (Next.js) and backend (NestJS)
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - '*.md'
+      - 'docs/**'
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+variables:
+  # Node.js version to use
+  nodeVersion: '20.x'
+  # Build configuration
+  buildConfiguration: 'production'
+
+stages:
+  - stage: Build
+    displayName: 'Build Stage'
+    jobs:
+      - job: BuildBackend
+        displayName: 'Build Backend (NestJS)'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(nodeVersion)'
+            displayName: 'Install Node.js'
+
+          - script: |
+              cd backend
+              npm ci
+            displayName: 'Install Backend Dependencies'
+
+          - script: |
+              cd backend
+              npm run lint
+            displayName: 'Lint Backend Code'
+
+          - script: |
+              cd backend
+              npm run test
+            displayName: 'Run Backend Unit Tests'
+            continueOnError: false
+
+          - script: |
+              cd backend
+              npm run test:e2e
+            displayName: 'Run Backend E2E Tests'
+            continueOnError: true
+
+          - script: |
+              cd backend
+              npm run build
+            displayName: 'Build Backend'
+
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'backend/test-results.xml'
+              searchFolder: '$(System.DefaultWorkingDirectory)'
+            condition: succeededOrFailed()
+            displayName: 'Publish Backend Test Results'
+
+          - task: PublishCodeCoverageResults@1
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: 'backend/coverage/cobertura-coverage.xml'
+              reportDirectory: 'backend/coverage/lcov-report'
+            condition: succeededOrFailed()
+            displayName: 'Publish Backend Code Coverage'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: 'backend/dist'
+              ArtifactName: 'backend-dist'
+              publishLocation: 'Container'
+            displayName: 'Publish Backend Artifacts'
+
+      - job: BuildFrontend
+        displayName: 'Build Frontend (Next.js)'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(nodeVersion)'
+            displayName: 'Install Node.js'
+
+          - script: |
+              cd frontend
+              npm ci
+            displayName: 'Install Frontend Dependencies'
+
+          - script: |
+              cd frontend
+              npm run lint
+            displayName: 'Lint Frontend Code'
+
+          - script: |
+              cd frontend
+              npm run type-check
+            displayName: 'TypeScript Type Check'
+
+          - script: |
+              cd frontend
+              npm run build
+            displayName: 'Build Frontend'
+            env:
+              NEXT_PUBLIC_API_URL: 'https://your-api-url.azurewebsites.net'
+              NEXT_PUBLIC_APP_URL: 'https://your-app-url.azurewebsites.net'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: 'frontend/.next'
+              ArtifactName: 'frontend-build'
+              publishLocation: 'Container'
+            displayName: 'Publish Frontend Artifacts'
+
+  - stage: Security
+    displayName: 'Security & Quality Stage'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: SecurityScan
+        displayName: 'Security Vulnerability Scan'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: |
+              # Install Trivy
+              sudo apt-get update
+              sudo apt-get install wget apt-transport-https gnupg lsb-release
+              wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+              echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+              sudo apt-get update
+              sudo apt-get install trivy
+            displayName: 'Install Trivy Scanner'
+
+          - script: |
+              trivy fs --format sarif --output trivy-results.sarif .
+            displayName: 'Run Trivy Security Scan'
+            continueOnError: true
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: 'trivy-results.sarif'
+              ArtifactName: 'security-scan'
+              publishLocation: 'Container'
+            displayName: 'Publish Security Scan Results'
+
+  - stage: Deploy
+    displayName: 'Deploy Stage'
+    dependsOn:
+      - Build
+      - Security
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployBackend
+        displayName: 'Deploy Backend to Azure'
+        environment: 'production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: backend-dist
+                  displayName: 'Download Backend Artifacts'
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: 'your-azure-service-connection'
+                    appType: 'webAppLinux'
+                    appName: 'your-backend-app-name'
+                    package: '$(Pipeline.Workspace)/backend-dist'
+                    runtimeStack: 'NODE|20-lts'
+                    startupCommand: 'npm run start:prod'
+                  displayName: 'Deploy Backend to Azure App Service'
+
+      - deployment: DeployFrontend
+        displayName: 'Deploy Frontend to Azure'
+        environment: 'production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: frontend-build
+                  displayName: 'Download Frontend Artifacts'
+
+                - task: AzureStaticWebApp@0
+                  inputs:
+                    app_location: '$(Pipeline.Workspace)/frontend-build'
+                    azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
+                  displayName: 'Deploy Frontend to Azure Static Web Apps'
+
+  - stage: PostDeploy
+    displayName: 'Post-Deployment Tests'
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+      - job: HealthCheck
+        displayName: 'Health Check & Smoke Tests'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: |
+              # Health check for backend
+              curl -f https://your-backend-app-name.azurewebsites.net/health || exit 1
+              # Health check for frontend
+              curl -f https://your-frontend-app-name.azurewebsites.net/ || exit 1
+            displayName: 'Application Health Check'
+
+          - script: |
+              # Add your smoke tests here
+              echo "Running smoke tests..."
+            displayName: 'Run Smoke Tests'
