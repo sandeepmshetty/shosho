@@ -49,7 +49,10 @@ const initialState: AuthState = getInitialState();
 // Async thunks
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+  async (
+    credentials: { email: string; password: string },
+    { rejectWithValue }
+  ) => {
     try {
       const response = await authAPI.login(credentials);
       return response.data;
@@ -61,12 +64,22 @@ export const loginUser = createAsyncThunk(
 
 export const registerUser = createAsyncThunk(
   'auth/register',
-  async (userData: { email: string; firstName: string; lastName: string; password: string }, { rejectWithValue }) => {
+  async (
+    userData: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      password: string;
+    },
+    { rejectWithValue }
+  ) => {
     try {
       const response = await authAPI.register(userData);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+      return rejectWithValue(
+        error.response?.data?.message || 'Registration failed'
+      );
     }
   }
 );
@@ -79,7 +92,9 @@ export const fetchUserProfile = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       // If we get a 401, we'll let the axios interceptor handle the logout
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch profile');
+      return rejectWithValue(
+        error.response?.data?.message || 'Failed to fetch profile'
+      );
     }
   }
 );
@@ -98,13 +113,17 @@ const authSlice = createSlice({
       // Clear from localStorage and cookie
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
-        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie =
+          'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       }
     },
     clearError: (state) => {
       state.error = null;
     },
-    setCredentials: (state, action: PayloadAction<{ user: User; accessToken: string }>) => {
+    setCredentials: (
+      state,
+      action: PayloadAction<{ user: User; accessToken: string }>
+    ) => {
       state.user = action.payload.user;
       state.token = action.payload.accessToken;
       state.isAuthenticated = true;
